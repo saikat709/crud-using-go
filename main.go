@@ -8,7 +8,7 @@ import (
 )
 
 type Todo struct {
-	ID        string `json:"id"`
+	Id        int    `json:"id"`
 	Completed bool   `json:"completed"`
 	Body      string `json:"body"`
 }
@@ -24,30 +24,32 @@ func main(){
 		return c.Status(200).SendString("Hello, World!")
 	})
 
-	app.Post("/todo", func(c *fiber.Ctx) error {
-		todo := new(Todo)
-
-		fmt.Println("Received request to create todo")
+	app.Post("/api/todo", func(c *fiber.Ctx) error {
+		todo := &Todo{}
 
 		if err := c.BodyParser(todo); err != nil {
+			fmt.Println("BodyParser error:", err)
 			return c.Status(400).JSON(fiber.Map{
 				"error": "cannot parse JSON",
 			})
 		}
 
-		fmt.Println(todo)
+		fmt.Printf("Received Todo: %+v\n", todo)
 
-		if (todo.Body == "") {
-			return c.Status(400).JSON(fiber.Map{
-				"error": "Missing todo body.",
-			})
-		}
+		// if (todo.Body == "") {
+		// 	return c.Status(400).JSON(fiber.Map{
+		// 		"error": "Missing todo body.",
+		// 	})
+		// }
 
+		todo.Id = len(todos) + 1
 		todos = append(todos, *todo)
-		return c.Status(201).SendString(todo.BODY)
+
+		fmt.Printf("fuck")
+		return c.Status(201).SendString("Todo created successfully")
 	})
 
-	app.Get("/todos", func(c *fiber.Ctx) error {
+	app.Get("/api/todos", func(c *fiber.Ctx) error {
 		return c.Status(200).JSON(todos)
 	})
 

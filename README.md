@@ -45,9 +45,38 @@ This is a simple CRUD application built with Go and the [Fiber](https://gofiber.
 
 ### Root
 
-- **URL:** `/`
+
+### Create a Todo
+- **URL:** `/api/todo`
+- **Method:** `POST`
+- **Content-Type:** `application/json`
+- **Body Example:**
+   ```json
+   {
+      "id": 1,
+      "completed": false,
+      "body": "New Body"
+   }
+   ```
+- **Curl Example:**
+   ```bash
+   curl -X POST http://localhost:3000/api/todo \
+      -H "Content-Type: application/json" \
+      -d '{"id":1,"completed":false,"body":"New Body"}'
+   ```
+
+### Get All Todos
+- **URL:** `/api/todos`
 - **Method:** `GET`
-- **Description:** Returns a "Hello, World!" message.
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:** `Hello, World!`
+- **Curl Example:**
+   ```bash
+   curl http://localhost:3000/api/todos
+   ```
+
+### Get Todo by ID
+- **URL:** `/todo/:id`
+- **Method:** `GET`
+- **Curl Example:**
+   ```bash
+   curl http://localhost:3000/todo/1
+   ```
