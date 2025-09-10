@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -8,6 +9,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Todo struct {
@@ -24,11 +27,28 @@ func main() {
 	}
 
 	PORT := os.Getenv("PORT")
-	fmt.Println("using port:", PORT)
+	MONGODB_URI := os.Getenv("MONGODB_URI")
+	fmt.Println("using port: ", PORT)
 
-	app := fiber.New()
+	// Database connection
+	clientOptions := options.Client().ApplyURI(MONGODB_URI)
+	client, err := mongo.Connect(context.Background(), clientOptions)
+
+	if err != nil {
+		log.Fatalf("Error connecting to MongoDB: %v", err)
+	}
+
+	err = client.Ping(context.Background(), nil)
+
+	if err != nil {
+		log.Fatalf("Error pinging MongoDB: %v", err)
+	}
+
+	log.Println("Connected to MongoDB!")
 
 	todos := []Todo{}
+
+	app := fiber.New()
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Status(200).SendString("Hello, World!")
@@ -161,5 +181,5 @@ func main() {
 		})
 	})
 
-	log.Fatal(app.Listen(PORT))
+	log.Fatal(app.Listen(":" + PORT))
 }
