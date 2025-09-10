@@ -60,7 +60,7 @@ This is a simple CRUD application built with Go and the [Fiber](https://gofiber.
    ```
 - **Curl Example:**
    ```bash
-   curl -X POST http://localhost:3000/api/todo \
+   curl -X POST http://localhost:3000/todo \
       -H "Content-Type: application/json" \
       -d '{"id":1,"completed":false,"body":"New Body"}'
    ```
@@ -70,7 +70,7 @@ This is a simple CRUD application built with Go and the [Fiber](https://gofiber.
 - **Method:** `GET`
 - **Curl Example:**
    ```bash
-   curl http://localhost:3000/api/todos
+   curl http://localhost:3000/todos
    ```
 
 ### Get Todo by ID
