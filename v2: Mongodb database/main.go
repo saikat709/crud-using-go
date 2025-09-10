@@ -9,15 +9,19 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Todo struct {
-	ID        int    `json:"id"`
-	Completed bool   `json:"completed"`
-	Body      string `json:"body"`
+	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	Completed bool               `json:"completed"`
+	Body      string             `json:"body"`
 }
+
+var collection *mongo.Collection
 
 func main() {
 
@@ -31,12 +35,15 @@ func main() {
 	fmt.Println("using port: ", PORT)
 
 	// Database connection
+
 	clientOptions := options.Client().ApplyURI(MONGODB_URI)
 	client, err := mongo.Connect(context.Background(), clientOptions)
 
 	if err != nil {
 		log.Fatalf("Error connecting to MongoDB: %v", err)
 	}
+
+	defer client.Disconnect(context.Background())
 
 	err = client.Ping(context.Background(), nil)
 
@@ -46,20 +53,48 @@ func main() {
 
 	log.Println("Connected to MongoDB!")
 
+	collection = client.Database("golang_db").Collection("todos")
+
 	todos := []Todo{}
 
 	app := fiber.New()
 
+	// routes
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Status(200).SendString("Hello, World!")
 	})
 
 	app.Get("/todos", func(c *fiber.Ctx) error {
+		var todos []Todo
+		cursor, err := collection.Find(context.Background(), bson.M{})
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Error fetching todos from database",
+			})
+		}
+		defer cursor.Close(context.Background())
+
+		for cursor.Next(context.Background()) {
+			var todo Todo
+			if err := cursor.Decode(&todo); err != nil {
+				return c.Status(500).JSON(fiber.Map{
+					"error": "Error decoding todo from database",
+				})
+			}
+			todos = append(todos, todo)
+		}
+
+		if err := cursor.Err(); err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Cursor error",
+			})
+		}
+
 		return c.Status(200).JSON(todos)
 	})
 
 	app.Post("/todo", func(c *fiber.Ctx) error {
-		todo := &Todo{}
+		todo := new(Todo)
 
 		if err := c.BodyParser(todo); err != nil {
 			fmt.Println("BodyParser error:", err)
@@ -76,7 +111,6 @@ func main() {
 			})
 		}
 
-		todo.ID = len(todos) + 1
 		todos = append(todos, *todo)
 
 		return c.Status(201).SendString("Todo created successfully")
