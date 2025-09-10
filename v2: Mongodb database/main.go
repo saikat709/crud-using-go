@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
@@ -54,8 +53,6 @@ func main() {
 	log.Println("Connected to MongoDB!")
 
 	collection = client.Database("golang_db").Collection("todos")
-
-	todos := []Todo{}
 
 	app := fiber.New()
 
@@ -111,107 +108,110 @@ func main() {
 			})
 		}
 
-		todos = append(todos, *todo)
+		_, err := collection.InsertOne(context.Background(), todo)
+
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Error inserting todo into database",
+			})
+		}
 
 		return c.Status(201).SendString("Todo created successfully")
 	})
 
 	app.Get("/todo/:id", func(c *fiber.Ctx) error {
-		id, err := strconv.Atoi(c.Params("id"))
+		id := c.Params("id")
+		objectID, err := primitive.ObjectIDFromHex(id)
 
 		if err != nil {
-			log.Fatalf("Error converting string to int: %v", err)
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Invalid ID format",
+			})
 		}
 
-		for _, todo := range todos {
-			if todo.ID == id {
-				return c.Status(200).JSON(todo)
+		filter := bson.M{"_id": objectID}
+		var todo Todo
+		err = collection.FindOne(context.Background(), filter).Decode(&todo)
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return c.Status(404).JSON(fiber.Map{
+					"error": "todo not found",
+				})
 			}
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Error fetching todo from database",
+			})
 		}
 
-		return c.Status(404).JSON(fiber.Map{
-			"error": "todo not found",
-		})
+		return c.Status(200).JSON(todo)
 	})
 
 	app.Delete("/todo/:id", func(c *fiber.Ctx) error {
-		id, err := strconv.Atoi(c.Params("id"))
+		id := c.Params("id")
+		objectId, err := primitive.ObjectIDFromHex(id)
 
 		if err != nil {
 			log.Fatalf("Error converting string to int: %v", err)
+			return c.Status(400).JSON(fiber.Map{
+				"error": "todo not found.",
+			})
 		}
 
-		for index, todo := range todos {
-			if todo.ID == id {
-				todos = append(todos[:index], todos[index+1:]...)
-				return c.Status(200).JSON(fiber.Map{
-					"message": "todo deleted successfully",
+		filter := bson.M{"_id": objectId}
+
+		_, err = collection.DeleteOne(context.Background(), filter)
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return c.Status(404).JSON(fiber.Map{
+					"error": "todo not found.",
 				})
 			}
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Error deletibg todo from database.",
+			})
 		}
 
-		return c.Status(404).JSON(fiber.Map{
-			"error": "todo not found",
+		return c.Status(200).JSON(fiber.Map{
+			"message": "Deleted successfully.",
 		})
 	})
 
 	app.Put("/todo/:id", func(c *fiber.Ctx) error {
-		id, err := strconv.Atoi(c.Params("id"))
+		id := c.Params("id")
+		objectId, err := primitive.ObjectIDFromHex(id)
+		todo := new((Todo))
 
 		if err != nil {
-			log.Fatalf("Error converting string to int: %v", err)
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Error converting hex to objectid.",
+			})
 		}
 
-		updatedTodo := &Todo{}
-
-		if err := c.BodyParser(updatedTodo); err != nil {
+		if err := c.BodyParser(todo); err != nil {
 			fmt.Println("BodyParser error:", err)
 			return c.Status(400).JSON(fiber.Map{
 				"error": "cannot parse JSON",
 			})
 		}
 
-		for index, todo := range todos {
-			if todo.ID == id {
-				todos[index].Body = updatedTodo.Body
-				todos[index].Completed = updatedTodo.Completed
-				return c.Status(200).JSON(todos[index])
-			}
-		}
+		filter := bson.M{"_id": objectId}
+		update := bson.M{"$set": bson.M{
+			"completed": todo.Completed,
+			"body":      todo.Body,
+		}}
 
-		return c.Status(404).JSON(fiber.Map{
-			"error": "todo not found",
-		})
-	})
-
-	app.Patch("/todo/:id", func(c *fiber.Ctx) error {
-		id, err := strconv.Atoi(c.Params("id"))
+		_, err = collection.UpdateOne(context.Background(), filter, update)
 
 		if err != nil {
-			log.Fatalf("Error converting string to int: %v", err)
-		}
-
-		updatedFields := &Todo{}
-
-		if err := c.BodyParser(updatedFields); err != nil {
-			fmt.Println("BodyParser error:", err)
 			return c.Status(400).JSON(fiber.Map{
-				"error": "cannot parse JSON",
+				"error": "Error Updating.",
 			})
 		}
 
-		for index, todo := range todos {
-			if todo.ID == id {
-				if updatedFields.Body != "" {
-					todos[index].Body = updatedFields.Body
-				}
-				todos[index].Completed = updatedFields.Completed
-				return c.Status(200).JSON(todos[index])
-			}
-		}
-
 		return c.Status(404).JSON(fiber.Map{
-			"error": "todo not found",
+			"message": "Updated succesfully.",
 		})
 	})
 
